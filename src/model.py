@@ -9,21 +9,33 @@ class ClassificationModel(nn.Module):
                  dropout: bool) -> None:
         super().__init__()
 
-        self.layer_1 = nn.Linear(input_size, hidden_units) 
+        self.linear_input = nn.Linear(input_size, hidden_units) 
         if dropout:
             self.dropout = nn.Dropout(0.2)
         self.relu = nn.ReLU()
-        self.layer_2 = nn.Linear(hidden_units, output_shape)
+        self.linear = nn.Linear(hidden_units, hidden_units) 
+        self.leaky_relu = nn.LeakyReLU()
+        self.sigmoid = nn.Sigmoid()
+        self.linear_output = nn.Linear(hidden_units, output_shape)
 
     def forward(self, x): 
         if self.dropout: 
-            x = self.layer_1(x)
-            x = self.dropout(x)
+            x = self.linear_input(x)
+            x = self.leaky_relu(x)
+            x = self.linear(x)
             x = self.relu(x)
-            x = self.layer_2(x)
+            x = self.linear(x)
+            x = self.relu(x)
+            x = self.linear_output(x)
+            x = self.sigmoid(x)
         else:
-            x = self.layer_1(x)
+            x = self.linear_input(x)
             x = self.relu(x)
-            x = self.layer_2(x)
+            x = self.linear(x)
+            x = self.relu(x)
+            x = self.linear(x)
+            x = self.relu(x)
+            x = self.linear_output(x)
+            x = self.sigmoid(x)
         return x
 

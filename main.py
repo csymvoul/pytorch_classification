@@ -4,33 +4,65 @@ import torch
 from torch import nn
 from tqdm.auto import tqdm
 from timeit import default_timer as timer
+from torchinfo import summary
 
 
-data_handler = DataHandler(data_path='data/dataset.csv')
-train, val, test = data_handler.get_data(train_size=0.7, val_size=0.15)
+data_handler = DataHandler(data_path='data/causal_dataset.csv')
 
 data_handler.get_data_info()
 print(data_handler.get_data_shape())
-train_X, train_y, test_X, test_y = data_handler.split_train_test()
-print(train_X.shape, train_y.shape, test_X.shape, test_y.shape)
+X_train, X_test, y_train, y_test = data_handler.get_data_tensors()
+print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
 
-model = ClassificationModel(input_size=10, hidden_units=20, output_shape=2, dropout=True)
+model = ClassificationModel(input_size=X_train.shape[1], 
+                            hidden_units=20, 
+                            output_shape=1, 
+                            dropout=True)
 
-EPOCHS = 10 
-BATCH_SIZE = 32
+model_summary = summary(model, input_size=(X_train.shape[1], ))
+print(model_summary)
+
+EPOCHS = 100 
 LEARNING_RATE = 0.001
 
 # define loss function and optimizer
 criterion = nn.BCEWithLogitsLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
 
-# create data loader
 
-
+st = timer()
 # train model
-for epoch in tqdm(range(EPOCHS)):
+for epoch in range(EPOCHS):
     model.train()
-    for batch, (train_X, train_y) in enumerate(train_loader):
+
     # forward pass
-    y_pred = model(train_X)
-    loss = criterion(y_pred, train_y)
+    y_pred = model(X_train)
+    
+    # compute loss
+    loss = criterion(y_pred, y_train.unsqueeze(dim=1))
+
+    # backward pass
+    loss.backward()
+
+    # zero out gradients
+    optimizer.zero_grad()
+
+    # update weights
+    optimizer.step()
+
+    # print loss
+    if epoch % 10 == 0:
+        print(f'Epoch: {epoch+1}, Loss: {loss.item():.3f}')
+
+et = timer()
+
+print(f'Time elapsed: {et-st:.2f} seconds')
+
+# evaluate model
+model.eval()
+with torch.inference_mode():
+    y_pred = model(X_test)
+    y_pred = torch.sigmoid(y_pred)
+    y_pred = torch.round(y_pred)
+    acc = (y_pred == y_test.unsqueeze(dim=1)).sum() / y_test.shape[0]
+    print(f'Accuracy: {acc.item():.3f}')
